@@ -2,8 +2,35 @@
 #include <TM1637Display.h>
 
 // Define the connections pins
-#define CLK 2
-#define DIO 3
+#define CLK 6
+#define DIO 5
+
+#define MENU_PIN 2
+#define ROT_A 4
+#define ROT_B 3
+
+// variables to manage rotary encoder
+volatile bool pinState = false;
+bool prevPinState = true;
+volatile unsigned long lastInterruptTime = 0;
+unsigned long debounce_delay = 15000;
+volatile bool pinALastState = false;
+bool pinACurrState = false;
+// bool prevPinState = false;
+unsigned int encoder_count = 0;
+unsigned int prev_encoder_count = 0;
+
+// variables for managing menu
+bool menuState = false;
+
+// variable for internal timings and delay
+unsigned long curr_time = 0;
+unsigned long serial_time = 0;
+unsigned long display_time = 0;
+int disp_count = 0;
+
+int value = 0;
+int prevValue = -1;
 
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(CLK, DIO);
@@ -33,31 +60,130 @@ const uint8_t celsius[] = {
   SEG_G | SEG_D | SEG_E
 };
 
+const uint8_t humid[] = {
+  SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+  0x00
+};
+
 void setup() {
+  Serial.begin(9600);
+  // Set up the pins
+  pinMode(MENU_PIN, INPUT_PULLUP);
+  pinMode(ROT_A, INPUT);
+  pinMode(ROT_B, INPUT);
+  pinMode(CLK, OUTPUT);
+  pinMode(DIO, OUTPUT);
+
+  // Attach interrupt for the menu pin
+  attachInterrupt(digitalPinToInterrupt(MENU_PIN),isr, FALLING);
+
   // Set the brightness to 5 (0=dimmest 7=brightest)
 	display.setBrightness(4);
 
 	// Set all segments ON
 	display.setSegments(allON);
+  delay(250);
 
-	delay(1000);
 	display.clear();
+
+  prevPinState = pinState;
 
 }
 
 void loop() {
-	
-	// Prints 15°C
-	int temperature = 15;
-  for(int i=0; i<100; i++){
-    temperature = i;
-    display.showNumberDec(temperature, false, 2, 0);
-	  display.setSegments(celsius, 2, 2);
-    delay(500);
+  // keep track on current time to manage delays
+  curr_time = millis();
+  if(curr_time - serial_time > 1000){
+    Serial.print("Menu: ");
+    Serial.print(menuState);
+    Serial.print(", PinState: ");
+    Serial.print(pinState);
+    Serial.print(", Previou pin state: ");
+    Serial.println(prevPinState);
+    serial_time = curr_time;
   }
-	
 
-	delay(2000);
-	// Prints dOnE
-	// display.setSegments(done);
+  // update display every 1 sec
+  if(curr_time - display_time > 1000){
+    display.showNumberDec(value);
+    display_time = curr_time;
+  }
+  
+  // check if buttonState changed so enter into menu
+  if(pinState != prevPinState){
+    menuState = true;
+    prevPinState = pinState;
+  }
+  // if menu selected enter menu loop
+  while(menuState){
+    // Get encoder readings
+    encoder_count = getEncoder(encoder_count);
+    if(encoder_count > prev_encoder_count){
+      value++;
+    }
+    if(encoder_count < prev_encoder_count){
+      value--;
+    }
+    prev_encoder_count = encoder_count;
+
+    // update display with a blink effect inside menu
+    if(millis() - display_time > 300){
+      disp_count++;
+      if(disp_count%2==0){
+        display.showNumberDec(value);
+      }else{
+        display.setSegments(allOFF);
+      }
+      if(disp_count > 20)disp_count = 0;
+      display_time = millis();
+    }
+    // exit menu if button pressed again
+    if(pinState != prevPinState){
+      prevPinState = pinState;
+      menuState = false;
+      break;
+    }
+    curr_time = millis();
+    if(curr_time - serial_time > 1000){
+    Serial.print("Menu: ");
+    Serial.print(menuState);
+    Serial.print(", PinState: ");
+    Serial.print(pinState);
+    Serial.print(", Previou pin state: ");
+    Serial.println(prevPinState);
+    serial_time = curr_time;
+  }
+  }
+
+}
+
+/* Interrupt service routine to detect menu pin pressed or not*/
+void isr(){
+  // get the current millis()
+  // unsigned long currentInterruptTime = millis();
+  // debounce using the interval parameter
+  if((long)(micros()-lastInterruptTime) >= debounce_delay){
+    pinState = !pinState;
+    // remember the interrupt time to maintain the debounce state
+    lastInterruptTime = micros();
+  }
+}
+
+/* Function to get encoder readings */
+unsigned int getEncoder(unsigned int cnt){
+  // Read present state of the rotary encoder pin A
+  pinACurrState = digitalRead(ROT_A);
+  // Check rotation status and increment or decrement based on direction
+  if(pinACurrState != pinALastState && pinACurrState == true){
+    if(digitalRead(ROT_B) != pinACurrState){
+      cnt--;
+    }else{
+      cnt++;
+    }
+    //Serial.println(count);
+  }
+  // remember the last state
+  pinALastState = pinACurrState;
+  //    delay(1);
+  return cnt;
 }
