@@ -14,8 +14,8 @@ volatile bool pinState = false;
 bool prevPinState = true;
 volatile unsigned long lastInterruptTime = 0;
 unsigned long debounce_delay = 15000;
-volatile bool pinALastState = false;
-bool pinACurrState = false;
+volatile bool pinALastState = true;
+bool pinACurrState = true;
 // bool prevPinState = false;
 unsigned int encoder_count = 0;
 unsigned int prev_encoder_count = 0;
@@ -27,6 +27,7 @@ bool menuState = false;
 unsigned long curr_time = 0;
 unsigned long serial_time = 0;
 unsigned long display_time = 0;
+unsigned long menu_time = 0;
 int disp_count = 0;
 
 int value = 0;
@@ -65,6 +66,10 @@ const uint8_t humid[] = {
   0x00
 };
 
+const uint8_t dash[] = {
+  SEG_G, SEG_G, SEG_G, SEG_G
+};
+
 void setup() {
   Serial.begin(9600);
   // Set up the pins
@@ -81,8 +86,8 @@ void setup() {
 	display.setBrightness(4);
 
 	// Set all segments ON
-	display.setSegments(allON);
-  delay(250);
+	display.setSegments(dash);
+  delay(500);
 
 	display.clear();
 
@@ -120,9 +125,13 @@ void loop() {
     encoder_count = getEncoder(encoder_count);
     if(encoder_count > prev_encoder_count){
       value++;
+      // update menu time to prevent exiting from menu
+      menu_time = curr_time;
     }
     if(encoder_count < prev_encoder_count){
       value--;
+      // update menu time to prevent exiting from menu
+      menu_time = curr_time;
     }
     prev_encoder_count = encoder_count;
 
@@ -135,12 +144,12 @@ void loop() {
         display.setSegments(allOFF);
       }
       if(disp_count > 20)disp_count = 0;
-      display_time = millis();
+      display_time = curr_time;
     }
-    // exit menu if button pressed again
-    if(pinState != prevPinState){
-      prevPinState = pinState;
+    // exit menu if after 2 seconds
+    if(curr_time - menu_time > 30000){
       menuState = false;
+      menu_time = curr_time;
       break;
     }
     curr_time = millis();
