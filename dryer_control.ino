@@ -137,7 +137,7 @@ void loop() {
 
     // update display with a blink effect inside menu
     if(millis() - display_time > 300){
-      disp_count++;
+      disp_count++; // keep a track on count to create blink effect
       if(disp_count%2==0){
         display.showNumberDec(value);
       }else{
@@ -152,16 +152,7 @@ void loop() {
       menu_time = curr_time;
       break;
     }
-    curr_time = millis();
-    if(curr_time - serial_time > 1000){
-    Serial.print("Menu: ");
-    Serial.print(menuState);
-    Serial.print(", PinState: ");
-    Serial.print(pinState);
-    Serial.print(", Previou pin state: ");
-    Serial.println(prevPinState);
-    serial_time = curr_time;
-  }
+    
   }
 
 }
