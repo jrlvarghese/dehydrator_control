@@ -11,7 +11,7 @@
 
 // variables to manage rotary encoder
 volatile bool pinState = false;
-bool prevPinState = true;
+bool prevPinState = false;
 volatile unsigned long lastInterruptTime = 0;
 unsigned long debounce_delay = 15000;
 volatile bool pinALastState = true;
@@ -24,6 +24,7 @@ unsigned int prev_encoder_count = 0;
 bool menuState = false;
 int menuItem = 0;
 int prevMenuItem = -1;
+bool selected = false;
 
 // variable for internal timings and delay
 unsigned long curr_time = 0;
@@ -91,7 +92,7 @@ void setup() {
   pinMode(DIO, OUTPUT);
 
   // Attach interrupt for the menu pin
-  attachInterrupt(digitalPinToInterrupt(MENU_PIN),isr, FALLING);
+  attachInterrupt(digitalPinToInterrupt(MENU_PIN),isr, RISING);
 
   // Set the brightness to 5 (0=dimmest 7=brightest)
 	display.setBrightness(4);
@@ -102,11 +103,14 @@ void setup() {
 
 	display.clear();
 
+  pinState = false;
   prevPinState = pinState;
 
   // set default values for temperature and humidity
   setTemperature = 58;
   setHumidity = 60;
+  // selected = false;
+  // menuState = false;
 }
 
 void loop() {
@@ -131,6 +135,7 @@ void loop() {
   // check if buttonState changed so enter into menu
   if(pinState != prevPinState){
     menuState = true;
+    prevMenuItem = -1;
     prevPinState = pinState;
   }
   // if menu selected enter menu loop
@@ -142,16 +147,57 @@ void loop() {
       updateMenu(menuItem, setTemperature, setHumidity);   
       menu_time = curr_time;  // Update menu time to prevent exiting from menu
     }
-    // switch(menuItem){
-    //   case 0:
-    //     display.setSegments(temp);
-    //     break;
-    //   case 1:
-    //     display.setSegments(humid);
-    //     break;
-    //   default:
-    //     break;
-    // }
+   
+    if(pinState != prevPinState){
+      selected = true;
+      prevPinState = pinState;
+    }
+    switch(menuItem){
+      case 0: // control loop for updating temperature
+        while(selected){
+          curr_time = millis();
+          // blink display to indicate it's selected
+          if(curr_time - display_time > 300){
+            disp_count++;
+            if(disp_count%2 == 0)updateMenu(menuItem, setTemperature, setHumidity);
+            else display.setSegments(allOFF);
+            if(disp_count >= 50 || (pinState != prevPinState)){
+              selected = false;
+              menuState = false;
+              prevMenuItem = -1;
+              disp_count = 0;
+              prevPinState = pinState;
+              break;
+              // menuItem = -1;
+            }
+            display_time = curr_time;
+          }
+        }
+        break;
+      case 1: // control loop for updating humidity
+        while(selected){
+          curr_time = millis();
+          // blink display to indicate it's selected
+          if(curr_time - display_time > 300){
+            disp_count++;
+            if(disp_count%2 == 0)updateMenu(menuItem, setTemperature, setHumidity);
+            else display.setSegments(allOFF);
+            if(disp_count >= 50 || (pinState != prevPinState)){
+              selected = false;
+              menuState = false;
+              prevMenuItem = -1;
+              disp_count = 0;
+              prevPinState = pinState;
+              break;
+              // menuItem = -1;
+            }
+            display_time = curr_time;
+          }
+        }
+        break;
+      default:
+        break;
+    }
     prevMenuItem = menuItem;  // Update the prevMenuItem to keep track on change
     // // update display with a blink effect inside menu
     // if(millis() - display_time > 300){
@@ -169,6 +215,7 @@ void loop() {
     if(curr_time - menu_time > 30000){
       menuState = false;
       menu_time = curr_time;
+      prevMenuItem = -1;
       break;
     }
     
@@ -232,12 +279,13 @@ int updateViaEncoder(int value, int min, int max){
 /* FUNCTION TO UPDATE MENU BASED ON SELECTION */
 void updateMenu(int menuItem, int t, int h){
   // display.showNumberDec(menuItem);  // Update display if there is channge
-  display.clear();
   if(menuItem == 0){
+    display.clear();
     display.setSegments(temp,1,0);
     display.showNumberDec(t, false, 2, 2);
   }
   if(menuItem == 1){
+    display.clear();
     display.setSegments(humid,1,0);
     display.showNumberDec(h, false, 2, 2);
   }
