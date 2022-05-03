@@ -35,6 +35,10 @@ int disp_count = 0;
 int value = 0;
 int prevValue = -1;
 
+// variables for humidity and temperature
+int setTemperature = 0;
+int setHumidity = 0;
+
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(CLK, DIO);
 
@@ -64,13 +68,18 @@ const uint8_t celsius[] = {
 };
 
 const uint8_t humid[] = {
-  SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
-  0x00
+  SEG_B | SEG_C | SEG_E | SEG_F | SEG_G
+};
+
+const uint8_t temp[] = {
+  SEG_D | SEG_E | SEG_F | SEG_G
 };
 
 const uint8_t dash[] = {
   SEG_G, SEG_G, SEG_G, SEG_G
 };
+
+const uint8_t arr[2][1] = {{temp},{humid}};
 
 void setup() {
   Serial.begin(9600);
@@ -95,6 +104,9 @@ void setup() {
 
   prevPinState = pinState;
 
+  // set default values for temperature and humidity
+  setTemperature = 58;
+  setHumidity = 60;
 }
 
 void loop() {
@@ -127,9 +139,19 @@ void loop() {
     menuItem = updateViaEncoder(menuItem, 0, 1);
     //if menuItem selection changed update display and reset menu time
     if(menuItem != prevMenuItem){
-      display.showNumberDec(menuItem);  // Update display if there is channge
+      updateMenu(menuItem, setTemperature, setHumidity);   
       menu_time = curr_time;  // Update menu time to prevent exiting from menu
     }
+    // switch(menuItem){
+    //   case 0:
+    //     display.setSegments(temp);
+    //     break;
+    //   case 1:
+    //     display.setSegments(humid);
+    //     break;
+    //   default:
+    //     break;
+    // }
     prevMenuItem = menuItem;  // Update the prevMenuItem to keep track on change
     // // update display with a blink effect inside menu
     // if(millis() - display_time > 300){
@@ -143,6 +165,7 @@ void loop() {
     //   display_time = curr_time;
     // }
     // exit menu if after 2 seconds
+    curr_time = millis();
     if(curr_time - menu_time > 30000){
       menuState = false;
       menu_time = curr_time;
@@ -204,5 +227,18 @@ int updateViaEncoder(int value, int min, int max){
   (value<min)?value=min:value;
 
   return value;
+}
 
+/* FUNCTION TO UPDATE MENU BASED ON SELECTION */
+void updateMenu(int menuItem, int t, int h){
+  // display.showNumberDec(menuItem);  // Update display if there is channge
+  display.clear();
+  if(menuItem == 0){
+    display.setSegments(temp,1,0);
+    display.showNumberDec(t, false, 2, 2);
+  }
+  if(menuItem == 1){
+    display.setSegments(humid,1,0);
+    display.showNumberDec(h, false, 2, 2);
+  }
 }
