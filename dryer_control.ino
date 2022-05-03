@@ -40,6 +40,8 @@ int prevValue = -1;
 // variables for humidity and temperature
 int setTemperature = 0;
 int setHumidity = 0;
+int temperature = 0;
+int humidity = 0;
 
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(CLK, DIO);
@@ -129,9 +131,25 @@ void loop() {
 
   // update display every 1 sec
   if(curr_time - display_time > 1000){
-    display.showNumberDec(value);
+    disp_count>200?disp_count = 0:disp_count++;
+    if(disp_count%2==0){
+      display.showNumberDec(setTemperature, false, 2, 0);
+      display.setSegments(celsius, 2, 2);
+    }else{
+      display.showNumberDec(setHumidity, false, 2, 0);
+      display.setSegments(humid, 1, 3);
+    }
+    
     display_time = curr_time;
   }
+  // humidity = setHumidity;
+  // temperature = setTemperature;
+  // if(curr_time - display_time > 2000){
+  //   disp_count>200?disp_count = 0:disp_count++;
+  //   if(disp_count%2==0)updateMenu(0, temperature, humidity);
+  //   else updateMenu(1, temperature, humidity);
+  //   display_time = curr_time;
+  // }
   
   // check if buttonState changed so enter into menu
   if(pinState != prevPinState){
@@ -194,10 +212,10 @@ void loop() {
         selected = false;
         menuState = false;
         prevMenuItem = -1;
+        menuItem = 0;
         disp_count = 0;
         prevPinState = pinState;
-        break;
-        // menuItem = -1;
+        break;  // exit the loop
       }
     }// endo of while loop inside submenu
     prevMenuItem = menuItem;  // Update the prevMenuItem to keep track on change
