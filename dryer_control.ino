@@ -31,6 +31,7 @@ unsigned long curr_time = 0;
 unsigned long serial_time = 0;
 unsigned long display_time = 0;
 unsigned long menu_time = 0;
+unsigned long sub_menu_time = 0;
 int disp_count = 0;
 
 int value = 0;
@@ -152,65 +153,55 @@ void loop() {
       selected = true;
       prevPinState = pinState;
     }
-    switch(menuItem){
-      case 0: // control loop for updating temperature
-        while(selected){
-          curr_time = millis();
-          // blink display to indicate it's selected
-          if(curr_time - display_time > 300){
-            disp_count++;
-            if(disp_count%2 == 0)updateMenu(menuItem, setTemperature, setHumidity);
-            else display.setSegments(allOFF);
-            if(disp_count >= 50 || (pinState != prevPinState)){
-              selected = false;
-              menuState = false;
-              prevMenuItem = -1;
-              disp_count = 0;
-              prevPinState = pinState;
-              break;
-              // menuItem = -1;
-            }
-            display_time = curr_time;
+    
+    while(selected){
+      curr_time = millis();
+      // Update set temperature or humidity value based on menu selection
+      if(menuItem == 0)setTemperature = updateViaEncoder(setTemperature, 40, 65);
+      if(menuItem == 1)setHumidity = updateViaEncoder(setHumidity, 20, 90);
+      
+      switch(menuItem){
+        case 0:
+          setTemperature = updateViaEncoder(setTemperature, 40, 65);
+          if(prevValue != setTemperature){
+            updateMenu(menuItem, setTemperature, setHumidity);
+            sub_menu_time = curr_time; // to prevent from auto exiting if rotatory encoder is turning
+            prevValue = setTemperature;
           }
-        }
-        break;
-      case 1: // control loop for updating humidity
-        while(selected){
-          curr_time = millis();
-          // blink display to indicate it's selected
-          if(curr_time - display_time > 300){
-            disp_count++;
-            if(disp_count%2 == 0)updateMenu(menuItem, setTemperature, setHumidity);
-            else display.setSegments(allOFF);
-            if(disp_count >= 50 || (pinState != prevPinState)){
-              selected = false;
-              menuState = false;
-              prevMenuItem = -1;
-              disp_count = 0;
-              prevPinState = pinState;
-              break;
-              // menuItem = -1;
-            }
-            display_time = curr_time;
+          break;
+        case 1:
+          setHumidity = updateViaEncoder(setHumidity, 20, 90);
+          if(prevValue != setHumidity){
+            updateMenu(menuItem, setTemperature, setHumidity);
+            sub_menu_time = curr_time; // to prevent from auto exiting if rotatory encoder is turning
+            prevValue = setHumidity;
           }
-        }
+          break;  
+        default:
+          break;      
+          
+      }
+      // blink display to indicate it's selected
+      if(curr_time - display_time > 300){
+        disp_count++;
+        // following two lines enable blinking effect
+        if(disp_count%2 == 0)updateMenu(menuItem, setTemperature, setHumidity);
+        else display.setSegments(allOFF);
+        display_time = curr_time;
+      }
+      // if time exceeds a limit or when the button is pressed exit selection
+      if((curr_time - sub_menu_time > 20000) || (pinState != prevPinState)){
+        selected = false;
+        menuState = false;
+        prevMenuItem = -1;
+        disp_count = 0;
+        prevPinState = pinState;
         break;
-      default:
-        break;
-    }
+        // menuItem = -1;
+      }
+    }// endo of while loop inside submenu
     prevMenuItem = menuItem;  // Update the prevMenuItem to keep track on change
-    // // update display with a blink effect inside menu
-    // if(millis() - display_time > 300){
-    //   disp_count++; // keep a track on count to create blink effect 
-    //   if(disp_count%2==0){
-    //     display.showNumberDec(value);
-    //   }else{
-    //     display.setSegments(allOFF);
-    //   }
-    //   if(disp_count > 20)disp_count = 0;
-    //   display_time = curr_time;
-    // }
-    // exit menu if after 2 seconds
+    
     curr_time = millis();
     if(curr_time - menu_time > 30000){
       menuState = false;
@@ -219,7 +210,7 @@ void loop() {
       break;
     }
     
-  }
+  }// end of while loop for main menu
 
 }
 
