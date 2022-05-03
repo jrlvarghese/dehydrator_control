@@ -22,6 +22,8 @@ unsigned int prev_encoder_count = 0;
 
 // variables for managing menu
 bool menuState = false;
+int menuItem = 0;
+int prevMenuItem = -1;
 
 // variable for internal timings and delay
 unsigned long curr_time = 0;
@@ -121,31 +123,25 @@ void loop() {
   }
   // if menu selected enter menu loop
   while(menuState){
-    // Get encoder readings
-    encoder_count = getEncoder(encoder_count);
-    if(encoder_count > prev_encoder_count){
-      value++;
-      // update menu time to prevent exiting from menu
-      menu_time = curr_time;
+    // update menu item 
+    menuItem = updateViaEncoder(menuItem, 0, 1);
+    //if menuItem selection changed update display and reset menu time
+    if(menuItem != prevMenuItem){
+      display.showNumberDec(menuItem);  // Update display if there is channge
+      menu_time = curr_time;  // Update menu time to prevent exiting from menu
     }
-    if(encoder_count < prev_encoder_count){
-      value--;
-      // update menu time to prevent exiting from menu
-      menu_time = curr_time;
-    }
-    prev_encoder_count = encoder_count;
-
-    // update display with a blink effect inside menu
-    if(millis() - display_time > 300){
-      disp_count++; // keep a track on count to create blink effect
-      if(disp_count%2==0){
-        display.showNumberDec(value);
-      }else{
-        display.setSegments(allOFF);
-      }
-      if(disp_count > 20)disp_count = 0;
-      display_time = curr_time;
-    }
+    prevMenuItem = menuItem;  // Update the prevMenuItem to keep track on change
+    // // update display with a blink effect inside menu
+    // if(millis() - display_time > 300){
+    //   disp_count++; // keep a track on count to create blink effect 
+    //   if(disp_count%2==0){
+    //     display.showNumberDec(value);
+    //   }else{
+    //     display.setSegments(allOFF);
+    //   }
+    //   if(disp_count > 20)disp_count = 0;
+    //   display_time = curr_time;
+    // }
     // exit menu if after 2 seconds
     if(curr_time - menu_time > 30000){
       menuState = false;
@@ -186,4 +182,27 @@ unsigned int getEncoder(unsigned int cnt){
   pinALastState = pinACurrState;
   //    delay(1);
   return cnt;
+}
+
+int updateViaEncoder(int value, int min, int max){
+  // Read present state of the rotary encoder pin A
+  pinACurrState = digitalRead(ROT_A);
+  // Check rotation status and increment or decrement based on direction
+  if(pinACurrState != pinALastState && pinACurrState == true){
+    if(digitalRead(ROT_B) != pinACurrState){
+      value--;
+    }else{
+      value++;
+    }
+    //Serial.println(count);
+  }
+  // remember the last state
+  pinALastState = pinACurrState;
+  //    delay(1);
+  // check if value exceeding the limits
+  (value>max)?value=max:value;
+  (value<min)?value=min:value;
+
+  return value;
+
 }
