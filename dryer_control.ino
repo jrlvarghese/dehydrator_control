@@ -68,7 +68,7 @@ const uint8_t done[] = {
 
 const uint8_t celsius[] = {
   0x00,
-  SEG_G | SEG_D | SEG_E
+  SEG_D | SEG_E | SEG_F | SEG_A
 };
 
 const uint8_t humid[] = {
@@ -133,9 +133,11 @@ void loop() {
   if(curr_time - display_time > 1000){
     disp_count>200?disp_count = 0:disp_count++;
     if(disp_count%2==0){
+      display.clear();
       display.showNumberDec(setTemperature, false, 2, 0);
       display.setSegments(celsius, 2, 2);
     }else{
+      display.clear();
       display.showNumberDec(setHumidity, false, 2, 0);
       display.setSegments(humid, 1, 3);
     }
@@ -166,7 +168,8 @@ void loop() {
       updateMenu(menuItem, setTemperature, setHumidity);   
       menu_time = curr_time;  // Update menu time to prevent exiting from menu
     }
-   
+    prevMenuItem = menuItem;  // Update the prevMenuItem to keep track on change
+
     if(pinState != prevPinState){
       selected = true;
       prevPinState = pinState;
@@ -218,7 +221,7 @@ void loop() {
         break;  // exit the loop
       }
     }// endo of while loop inside submenu
-    prevMenuItem = menuItem;  // Update the prevMenuItem to keep track on change
+    
     
     curr_time = millis();
     if(curr_time - menu_time > 30000){
