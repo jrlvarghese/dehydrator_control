@@ -1,5 +1,7 @@
 // Include the library
 #include <TM1637Display.h>
+#include <Adafruit_AHTX0.h>
+Adafruit_AHTX0 aht;
 
 // Define the connections pins
 #define CLK 6
@@ -85,6 +87,9 @@ const uint8_t dash[] = {
 
 const uint8_t arr[2][1] = {{temp},{humid}};
 
+// variables for temp and humidity from aht_21
+sensors_event_t aht_hum, aht_temp;
+
 void setup() {
   Serial.begin(9600);
   // Set up the pins
@@ -103,11 +108,17 @@ void setup() {
 	// Set all segments ON
 	display.setSegments(dash);
   delay(500);
-
+  //clear display
 	display.clear();
-
+  // set pin default pin states
   pinState = false;
   prevPinState = pinState;
+
+  // initialize humidity sensor AHT_20
+  if (! aht.begin()) {
+    // Serial.println("Could not find AHT? Check wiring");
+    while (1) delay(10);
+  }
 
   // set default values for temperature and humidity
   setTemperature = 58;
@@ -131,14 +142,20 @@ void loop() {
 
   // update display every 1 sec
   if(curr_time - display_time > 1000){
+    // read humidity and temperature from aht_21
+    aht.getEvent(&aht_hum, &aht_temp);
+    int temp_read = aht_temp.temperature;
+    int hum_read = aht_hum.relative_humidity;
     disp_count>200?disp_count = 0:disp_count++;
     if(disp_count%2==0){
       display.clear();
-      display.showNumberDec(setTemperature, false, 2, 0);
+      // display.showNumberDec(setTemperature, false, 2, 0);
+      display.showNumberDec(temp_read, false, 2, 0);
       display.setSegments(celsius, 2, 2);
     }else{
       display.clear();
-      display.showNumberDec(setHumidity, false, 2, 0);
+      // display.showNumberDec(setHumidity, false, 2, 0);
+      display.showNumberDec(hum_read, false, 2, 0);
       display.setSegments(humid, 1, 3);
     }
     
