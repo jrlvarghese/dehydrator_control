@@ -1,6 +1,10 @@
 // Include the library
-#include <TM1637Display.h>
-#include <Adafruit_AHTX0.h>
+#include <TM1637Display.h> // for LED display
+#include <Adafruit_AHTX0.h> // for AHT temperature and humidity sensor
+#include <OneWire.h> // once wire communication for DS18B20 sensor
+#include <DallasTemperature.h>  // DS18B20 communication
+
+// Initialise AHT sensor
 Adafruit_AHTX0 aht;
 
 // Define the connections pins
@@ -10,6 +14,12 @@ Adafruit_AHTX0 aht;
 #define MENU_PIN 2
 #define ROT_A 4
 #define ROT_B 3
+
+#define DS18B20_PIN 7
+
+// setup onewire and DS18B20 
+OneWire oneWire(DS18B20_PIN);
+DallasTemperature sensors(&oneWire);
 
 // variables to manage rotary encoder
 volatile bool pinState = false;
@@ -35,6 +45,7 @@ unsigned long display_time = 0;
 unsigned long menu_time = 0;
 unsigned long sub_menu_time = 0;
 int disp_count = 0;
+unsigned long sensor_time = 0;
 
 int value = 0;
 int prevValue = -1;
@@ -44,6 +55,7 @@ int setTemperature = 0;
 int setHumidity = 0;
 int temperature = 0;
 int humidity = 0;
+float ds_temperature = 0;
 
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(CLK, DIO);
@@ -114,6 +126,9 @@ void setup() {
   pinState = false;
   prevPinState = pinState;
 
+  // initialize DS18B20 temperature sensor
+  sensors.begin();
+
   // initialize humidity sensor AHT_20
   if (! aht.begin()) {
     // Serial.println("Could not find AHT? Check wiring");
@@ -140,35 +155,36 @@ void loop() {
     serial_time = curr_time;
   }
 
-  // update display every 1 sec
-  if(curr_time - display_time > 1000){
+  if(curr_time - sensor_time > 1000){
     // read humidity and temperature from aht_21
     aht.getEvent(&aht_hum, &aht_temp);
-    int temp_read = aht_temp.temperature;
-    int hum_read = aht_hum.relative_humidity;
+    // read temperature from DS18B20
+    sensors.requestTemperatures();
+    ds_temperature = sensors.getTempCByIndex(0);
+
+    temperature = aht_temp.temperature;
+    humidity = aht_hum.relative_humidity;
+    sensor_time = curr_time;
+  }
+
+  // update display every 2 sec
+  if(curr_time - display_time > 2000){
     disp_count>200?disp_count = 0:disp_count++;
     if(disp_count%2==0){
       display.clear();
       // display.showNumberDec(setTemperature, false, 2, 0);
-      display.showNumberDec(temp_read, false, 2, 0);
+      display.showNumberDec(int(ds_temperature), false, 2, 0);
       display.setSegments(celsius, 2, 2);
     }else{
       display.clear();
       // display.showNumberDec(setHumidity, false, 2, 0);
-      display.showNumberDec(hum_read, false, 2, 0);
+      display.showNumberDec(humidity, false, 2, 0);
       display.setSegments(humid, 1, 3);
     }
     
     display_time = curr_time;
   }
-  // humidity = setHumidity;
-  // temperature = setTemperature;
-  // if(curr_time - display_time > 2000){
-  //   disp_count>200?disp_count = 0:disp_count++;
-  //   if(disp_count%2==0)updateMenu(0, temperature, humidity);
-  //   else updateMenu(1, temperature, humidity);
-  //   display_time = curr_time;
-  // }
+  
   
   // check if buttonState changed so enter into menu
   if(pinState != prevPinState){
