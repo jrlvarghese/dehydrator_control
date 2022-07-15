@@ -3,6 +3,7 @@
 #include <Adafruit_AHTX0.h> // for AHT temperature and humidity sensor
 #include <OneWire.h> // once wire communication for DS18B20 sensor
 #include <DallasTemperature.h>  // DS18B20 communication
+#include <Servo.h>
 
 // Initialise AHT sensor
 Adafruit_AHTX0 aht;
