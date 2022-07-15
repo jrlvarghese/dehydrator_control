@@ -51,11 +51,19 @@ int value = 0;
 int prevValue = -1;
 
 // variables for humidity and temperature
-int setTemperature = 0;
-int setHumidity = 0;
-int temperature = 0;
-int humidity = 0;
+float setTemperature = 0;
+float setHumidity = 0;
+float tempHysteresis = 2;
+float humidHysteresis = 2;
+float temperature = 0;
+float humidity = 0;
 float ds_temperature = 0;
+float tempArray[10] = {0,0,0,0,0,0,0,0,0,0};
+float humidArray[10] = {0,0,0,0,0,0,0,0,0,0};
+float avgTemperature = 0;
+float avgHumidity = 0;
+int avgCounter = 0;
+bool heater_state = false;
 
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(CLK, DIO);
@@ -81,7 +89,6 @@ const uint8_t done[] = {
 // };
 
 const uint8_t celsius[] = {
-  0x00,
   SEG_D | SEG_E | SEG_F | SEG_A
 };
 
@@ -95,6 +102,13 @@ const uint8_t temp[] = {
 
 const uint8_t dash[] = {
   SEG_G, SEG_G, SEG_G, SEG_G
+};
+
+const uint8_t heat[] = {
+  SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+  SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,
+  SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+  SEG_D | SEG_E | SEG_F | SEG_G
 };
 
 const uint8_t arr[2][1] = {{temp},{humid}};
@@ -136,8 +150,8 @@ void setup() {
   }
 
   // set default values for temperature and humidity
-  setTemperature = 58;
-  setHumidity = 60;
+  setTemperature = 60;
+  setHumidity = 40;
   // selected = false;
   // menuState = false;
 }
@@ -146,42 +160,82 @@ void loop() {
   // keep track on current time to manage delays
   curr_time = millis();
   if(curr_time - serial_time > 1000){
-    Serial.print("Menu: ");
-    Serial.print(menuState);
-    Serial.print(", PinState: ");
-    Serial.print(pinState);
-    Serial.print(", Previou pin state: ");
-    Serial.println(prevPinState);
+    // Serial.print("Menu: ");
+    // Serial.print(menuState);
+    // Serial.print(", PinState: ");
+    // Serial.print(pinState);
+    // Serial.print(", Previou pin state: ");
+    // Serial.println(prevPinState);
+    Serial.print("Set temp: ");
+    Serial.print(setTemperature);
+    Serial.print("; Avg temp: ");
+    Serial.println(avgTemperature);
+    Serial.print("Set humidity: ");
+    Serial.print(setHumidity);
+    Serial.print("; Avg Humidity: ");
+    Serial.println(avgHumidity);
+    Serial.print("Avg Counter: ");
+    Serial.println(avgCounter);
+    Serial.println();
     serial_time = curr_time;
   }
 
   if(curr_time - sensor_time > 1000){
     // read humidity and temperature from aht_21
     aht.getEvent(&aht_hum, &aht_temp);
+    temperature = aht_temp.temperature;
+    humidity = aht_hum.relative_humidity;
     // read temperature from DS18B20
     sensors.requestTemperatures();
     ds_temperature = sensors.getTempCByIndex(0);
+    // calculate average of last readings
+    tempArray[avgCounter] = ds_temperature;
+    humidArray[avgCounter] = humidity;
+    // increment avgCounter to store temperature in array
+    (avgCounter>=9)?avgCounter=0:avgCounter++;
+    avgTemperature = get_avg(tempArray);
+    avgHumidity = get_avg(humidArray);
+    //control sequence for temperature
+    if(avgTemperature - setTemperature > 0.1){
+      heaterControl(false);
+      heater_state = false;
+    }
+    if(((setTemperature - tempHysteresis) - avgTemperature) > 0.1){
+      heaterControl(true);
+      heater_state = true;
+    }
+    //control sequence for humidity
+    if((avgHumidity - setHumidity > 0.1)&&(avgTemperature > (setTemperature - 5.0))){
+      exhaustOpen();
+    }
+    if(((setHumidity - humidHysteresis) - avgHumidity) > 0.1){
+      exhaustClose();
+    }
 
-    temperature = aht_temp.temperature;
-    humidity = aht_hum.relative_humidity;
     sensor_time = curr_time;
   }
 
   // update display every 2 sec
   if(curr_time - display_time > 2000){
-    disp_count>200?disp_count = 0:disp_count++;
-    if(disp_count%2==0){
+    if(heater_state)disp_count>2?disp_count = 0:disp_count;
+    else disp_count>1?disp_count = 0:disp_count;
+    if(disp_count==0){
       display.clear();
       // display.showNumberDec(setTemperature, false, 2, 0);
       display.showNumberDec(int(ds_temperature), false, 2, 0);
-      display.setSegments(celsius, 2, 2);
-    }else{
+      display.setSegments(celsius, 1, 3);
+    }
+    if(disp_count==1){
       display.clear();
       // display.showNumberDec(setHumidity, false, 2, 0);
       display.showNumberDec(humidity, false, 2, 0);
       display.setSegments(humid, 1, 3);
     }
-    
+    if(disp_count==2){
+      display.clear();
+      display.setSegments(heat,4,0);
+    }
+    disp_count++;
     display_time = curr_time;
   }
   
@@ -334,4 +388,29 @@ void updateMenu(int menuItem, int t, int h){
     display.setSegments(humid,1,0);
     display.showNumberDec(h, false, 2, 2);
   }
+}
+
+/* FUNCTION TO CALCULATE AVERAGE */
+float get_avg(float arr[]){
+  float sum = 0;
+  for (int i=0; i<10; i++){
+    sum+=arr[i];
+  }
+  return sum/10.0;
+ }
+
+void heaterControl(bool status){
+  if(status){
+    digitalWrite(13,HIGH);
+  }else{
+    digitalWrite(13,LOW);
+  }
+}
+
+void exhaustClose(){
+  digitalWrite(12, HIGH);
+}
+
+void exhaustOpen(){
+  digitalWrite(12, LOW);
 }
