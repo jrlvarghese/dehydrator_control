@@ -18,9 +18,14 @@ Adafruit_AHTX0 aht;
 
 #define DS18B20_PIN 7
 
+#define H1 10
+#define H2 11
+#define H3 12
+#define H4 13
+
 // setup onewire and DS18B20 
 OneWire oneWire(DS18B20_PIN);
-DallasTemperature sensors(&oneWire);
+DallasTemperature ds_sensor(&oneWire);
 
 // variables to manage rotary encoder
 volatile bool pinState = false;
@@ -65,6 +70,7 @@ float avgTemperature = 0;
 float avgHumidity = 0;
 int avgCounter = 0;
 bool heater_state = false;
+bool ds_sensor_status = false;
 
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(CLK, DIO);
@@ -112,6 +118,17 @@ const uint8_t heat[] = {
   SEG_D | SEG_E | SEG_F | SEG_G
 };
 
+const uint8_t fail[] = {
+  SEG_A | SEG_E | SEG_F | SEG_G,
+  SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+  SEG_E| SEG_F,
+  SEG_E| SEG_F | SEG_D
+};
+
+// const uint8_t sens[] = {
+
+// }
+
 const uint8_t arr[2][1] = {{temp},{humid}};
 
 // variables for temp and humidity from aht_21
@@ -125,6 +142,16 @@ void setup() {
   pinMode(ROT_B, INPUT);
   pinMode(CLK, OUTPUT);
   pinMode(DIO, OUTPUT);
+
+  pinMode(H1, OUTPUT);
+  pinMode(H2, OUTPUT);
+  pinMode(H3, OUTPUT);
+  pinMode(H4, OUTPUT);
+
+  digitalWrite(H1, LOW);
+  digitalWrite(H2, LOW);
+  digitalWrite(H3, LOW);
+  digitalWrite(H4, LOW);
 
   // Attach interrupt for the menu pin
   attachInterrupt(digitalPinToInterrupt(MENU_PIN),isr, RISING);
@@ -142,7 +169,7 @@ void setup() {
   prevPinState = pinState;
 
   // initialize DS18B20 temperature sensor
-  sensors.begin();
+  ds_sensor.begin();
 
   // initialize humidity sensor AHT_20
   if (! aht.begin()) {
@@ -187,8 +214,15 @@ void loop() {
     temperature = aht_temp.temperature;
     humidity = aht_hum.relative_humidity;
     // read temperature from DS18B20
-    sensors.requestTemperatures();
-    ds_temperature = sensors.getTempCByIndex(0);
+    ds_sensor.requestTemperatures();
+    ds_temperature = ds_sensor.getTempCByIndex(0);
+    // check if sensor is connected or any connection issues
+    if(ds_temperature == DEVICE_DISCONNECTED_C){
+      Serial.println("Device disconnected...");
+      ds_sensor_status = false;
+    }else{
+      ds_sensor_status = true;
+    }    
     // calculate average of last readings
     tempArray[avgCounter] = ds_temperature;
     humidArray[avgCounter] = humidity;
@@ -198,12 +232,12 @@ void loop() {
     avgHumidity = get_avg(humidArray);
     //control sequence for temperature
     if(avgTemperature - setTemperature > 0.1){
-      heaterControl(false);
-      heater_state = false;
+      // if avgTemperature above set temperature
+      heater_state = LOW;
     }
     if(((setTemperature - tempHysteresis) - avgTemperature) > 0.1){
-      heaterControl(true);
-      heater_state = true;
+      // if avgTemperature less than set temperature
+      heater_state = HIGH;
     }
     //control sequence for humidity
     if((avgHumidity - setHumidity > 0.1)&&(avgTemperature > (setTemperature - 5.0))){
@@ -220,27 +254,41 @@ void loop() {
   if(curr_time - display_time > 2000){
     if(heater_state)disp_count>2?disp_count = 0:disp_count;
     else disp_count>1?disp_count = 0:disp_count;
-    if(disp_count==0){
+    // display readings only if sensor is working
+    if(ds_sensor_status){
+      if(disp_count==0){
+        display.clear();
+        // display.showNumberDec(setTemperature, false, 2, 0);
+        display.showNumberDec(int(ds_temperature), false, 2, 0);
+        display.setSegments(celsius, 1, 3);
+      }
+      if(disp_count==1){
+        display.clear();
+        // display.showNumberDec(setHumidity, false, 2, 0);
+        display.showNumberDec(humidity, false, 2, 0);
+        display.setSegments(humid, 1, 3);
+      }
+      if(disp_count==2){
+        display.clear();
+        display.setSegments(heat,4,0);
+      }
+    }else{// if sensor is not connected or failed
       display.clear();
-      // display.showNumberDec(setTemperature, false, 2, 0);
-      display.showNumberDec(int(ds_temperature), false, 2, 0);
-      display.setSegments(celsius, 1, 3);
+      display.setSegments(fail,4,0);
     }
-    if(disp_count==1){
-      display.clear();
-      // display.showNumberDec(setHumidity, false, 2, 0);
-      display.showNumberDec(humidity, false, 2, 0);
-      display.setSegments(humid, 1, 3);
-    }
-    if(disp_count==2){
-      display.clear();
-      display.setSegments(heat,4,0);
-    }
+    // increment display counter
     disp_count++;
     display_time = curr_time;
   }
-  
-  
+
+  // control heater based on the state
+  // switch on the heater only if the sensor is connected
+  if(ds_sensor_status){
+    heaterControl(heater_state);
+  }else{
+    heaterControl(LOW);
+  }
+    
   // check if buttonState changed so enter into menu
   if(pinState != prevPinState){
     menuState = true;
@@ -249,6 +297,8 @@ void loop() {
   }
   // if menu selected enter menu loop
   while(menuState){
+    // switch off the heater while inside menu
+    heaterControl(LOW);
     // update menu item 
     menuItem = updateViaEncoder(menuItem, 0, 1);
     //if menuItem selection changed update display and reset menu time
@@ -400,18 +450,18 @@ float get_avg(float arr[]){
   return sum/10.0;
  }
 
-void heaterControl(bool status){
-  if(status){
-    digitalWrite(13,HIGH);
-  }else{
-    digitalWrite(13,LOW);
-  }
-}
-
 void exhaustClose(){
-  digitalWrite(12, HIGH);
+  digitalWrite(A0, HIGH);
 }
 
 void exhaustOpen(){
-  digitalWrite(12, LOW);
+  digitalWrite(A0, LOW);
+}
+
+/* FUNCTION TO CONTROL HEATER */
+void heaterControl(bool state){
+  digitalWrite(H1, state);
+  digitalWrite(H2, state);
+  digitalWrite(H3, state);
+  digitalWrite(H4, state);
 }
