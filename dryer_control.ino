@@ -121,8 +121,8 @@ const uint8_t heat[] = {
 const uint8_t fail[] = {
   SEG_A | SEG_E | SEG_F | SEG_G,
   SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
-  SEG_E| SEG_F,
-  SEG_E| SEG_F | SEG_D
+  SEG_E | SEG_F,
+  SEG_E | SEG_F | SEG_D
 };
 
 // const uint8_t sens[] = {
@@ -172,10 +172,11 @@ void setup() {
   ds_sensor.begin();
 
   // initialize humidity sensor AHT_20
-  if (! aht.begin()) {
-    // Serial.println("Could not find AHT? Check wiring");
-    while (1) delay(10);
-  }
+  aht.begin();
+  // if (! aht.begin()) {
+  //   // Serial.println("Could not find AHT? Check wiring");
+  //   while (1) delay(10);
+  // }
 
   // set default values for temperature and humidity
   setTemperature = 60;
