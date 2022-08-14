@@ -114,11 +114,16 @@ const uint8_t dash[] = {
   SEG_G, SEG_G, SEG_G, SEG_G
 };
 
+// const uint8_t heat[] = {
+//   SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+//   SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,
+//   SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+//   SEG_D | SEG_E | SEG_F | SEG_G
+// };
+
 const uint8_t heat[] = {
   SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
-  SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,
-  SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
-  SEG_D | SEG_E | SEG_F | SEG_G
+  SEG_A | SEG_B | SEG_E | SEG_F | SEG_G
 };
 
 const uint8_t fail[] = {
@@ -127,10 +132,6 @@ const uint8_t fail[] = {
   SEG_E | SEG_F,
   SEG_E | SEG_F | SEG_D
 };
-
-// const uint8_t sens[] = {
-
-// }
 
 const uint8_t power[] = {
   SEG_A | SEG_B | SEG_E | SEG_F | SEG_G
@@ -168,7 +169,7 @@ void setup() {
 
 	// Set all segments ON
 	display.setSegments(dash);
-  delay(500);
+  delay(1000);
   //clear display
 	display.clear();
   // set pin default pin states
@@ -279,7 +280,8 @@ void loop() {
       }
       if(disp_count==2){
         display.clear();
-        display.setSegments(heat,4,0);
+        display.setSegments(heat,2,0);
+        display.showNumberDec(setPower, false, 1, 3);
       }
     }else{// if sensor is not connected or failed
       display.clear();
