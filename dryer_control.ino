@@ -72,6 +72,9 @@ int avgCounter = 0;
 bool heater_state = false;
 bool ds_sensor_status = false;
 
+// for setting power
+int setPower = 0;
+
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(CLK, DIO);
 
@@ -129,6 +132,10 @@ const uint8_t fail[] = {
 
 // }
 
+const uint8_t power[] = {
+  SEG_A | SEG_B | SEG_E | SEG_F | SEG_G
+};
+
 const uint8_t arr[2][1] = {{temp},{humid}};
 
 // variables for temp and humidity from aht_21
@@ -178,9 +185,10 @@ void setup() {
   //   while (1) delay(10);
   // }
 
-  // set default values for temperature and humidity
+  // set default values for temperature, humidity and power
   setTemperature = 60;
   setHumidity = 40;
+  setPower = 4;
   // selected = false;
   // menuState = false;
 }
@@ -284,10 +292,10 @@ void loop() {
 
   // control heater based on the state
   // switch on the heater only if the sensor is connected
-  if(ds_sensor_status){
-    heaterControl(heater_state);
+  if(ds_sensor_status && heater_state){
+    heaterControl(setPower);
   }else{
-    heaterControl(LOW);
+    heaterControl(0);
   }
     
   // check if buttonState changed so enter into menu
@@ -299,12 +307,12 @@ void loop() {
   // if menu selected enter menu loop
   while(menuState){
     // switch off the heater while inside menu
-    heaterControl(LOW);
+    heaterControl(0);
     // update menu item 
-    menuItem = updateViaEncoder(menuItem, 0, 1);
+    menuItem = updateViaEncoder(menuItem, 0, 2);
     //if menuItem selection changed update display and reset menu time
     if(menuItem != prevMenuItem){
-      updateMenu(menuItem, setTemperature, setHumidity);   
+      updateMenu(menuItem, setTemperature, setHumidity, setPower);   
       menu_time = curr_time;  // Update menu time to prevent exiting from menu
     }
     prevMenuItem = menuItem;  // Update the prevMenuItem to keep track on change
@@ -319,12 +327,13 @@ void loop() {
       // Update set temperature or humidity value based on menu selection
       if(menuItem == 0)setTemperature = updateViaEncoder(setTemperature, 40, 65);
       if(menuItem == 1)setHumidity = updateViaEncoder(setHumidity, 20, 90);
+      if(menuItem == 2)setPower = updateViaEncoder(setPower, 1, 4);
       
       switch(menuItem){
         case 0:
           setTemperature = updateViaEncoder(setTemperature, 40, 65);
           if(prevValue != setTemperature){
-            updateMenu(menuItem, setTemperature, setHumidity);
+            updateMenu(menuItem, setTemperature, setHumidity, setPower);
             sub_menu_time = curr_time; // to prevent from auto exiting if rotatory encoder is turning
             prevValue = setTemperature;
           }
@@ -332,11 +341,18 @@ void loop() {
         case 1:
           setHumidity = updateViaEncoder(setHumidity, 20, 90);
           if(prevValue != setHumidity){
-            updateMenu(menuItem, setTemperature, setHumidity);
+            updateMenu(menuItem, setTemperature, setHumidity, setPower);
             sub_menu_time = curr_time; // to prevent from auto exiting if rotatory encoder is turning
             prevValue = setHumidity;
           }
           break;  
+        case 2:
+          setPower = updateViaEncoder(setPower, 1, 4);
+          if(prevValue != setPower){
+            updateMenu(menuItem, setTemperature, setHumidity, setPower);
+            sub_menu_time = curr_time; // to prevent from auto exiting if rotatory encoder is turning
+            prevValue = setPower;
+          }
         default:
           break;      
           
@@ -345,7 +361,7 @@ void loop() {
       if(curr_time - display_time > 300){
         disp_count++;
         // following two lines enable blinking effect
-        if(disp_count%2 == 0)updateMenu(menuItem, setTemperature, setHumidity);
+        if(disp_count%2 == 0)updateMenu(menuItem, setTemperature, setHumidity, setPower);
         else display.setSegments(allOFF);
         display_time = curr_time;
       }
@@ -428,18 +444,26 @@ int updateViaEncoder(int value, int min, int max){
 }
 
 /* FUNCTION TO UPDATE MENU BASED ON SELECTION */
-void updateMenu(int menuItem, int t, int h){
+void updateMenu(int menuItem, int t, int h, int p){
   // display.showNumberDec(menuItem);  // Update display if there is channge
   if(menuItem == 0){
     display.clear();
     display.setSegments(temp,1,0);
     display.showNumberDec(t, false, 2, 2);
   }
+  // display for humidity 
   if(menuItem == 1){
     display.clear();
     display.setSegments(humid,1,0);
     display.showNumberDec(h, false, 2, 2);
   }
+  // display for power
+  if(menuItem == 2){
+    display.clear();
+    display.setSegments(power,1,0);
+    display.showNumberDec(p, false, 2, 2);
+  }
+
 }
 
 /* FUNCTION TO CALCULATE AVERAGE */
@@ -460,9 +484,34 @@ void exhaustOpen(){
 }
 
 /* FUNCTION TO CONTROL HEATER */
-void heaterControl(bool state){
-  digitalWrite(H1, state);
-  digitalWrite(H2, state);
-  digitalWrite(H3, state);
-  digitalWrite(H4, state);
+void heaterControl(int p){
+  switch(p){
+    case 0:
+      digitalWrite(H1, LOW);
+      digitalWrite(H2, LOW);
+      digitalWrite(H3, LOW);
+      digitalWrite(H4, LOW);
+      break;
+    case 1:
+      digitalWrite(H1, HIGH);
+      break;
+    case 2:
+      digitalWrite(H1, HIGH);
+      digitalWrite(H2, HIGH);
+      break;
+    case 3:
+      digitalWrite(H1, HIGH);
+      digitalWrite(H2, HIGH);
+      digitalWrite(H3, HIGH);
+      break;
+    case 4:
+      digitalWrite(H1, HIGH);
+      digitalWrite(H2, HIGH);
+      digitalWrite(H3, HIGH);
+      digitalWrite(H4, HIGH);
+      break;
+    default:
+      break;
+  }
+  
 }
